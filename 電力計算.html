@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電力計算ツール(VT・CT比)</title>
+<style>
+  :root{
+    --bg: #12161c;
+    --panel: #1b212a;
+    --panel-2: #222a35;
+    --line: #303a47;
+    --text: #e8ecf1;
+    --text-dim: #8b96a5;
+    --accent: #e8a33d;
+    --accent-dim: #8a6323;
+    --good: #5fbf8f;
+  }
+  * { box-sizing: border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    line-height:1.5;
+    padding:20px 14px 60px;
+  }
+  .wrap{ max-width:520px; margin:0 auto; }
+  h1{ font-size:19px; font-weight:700; margin:0 0 4px; letter-spacing:0.01em; }
+  .sub{ color:var(--text-dim); font-size:13px; margin:0 0 22px; }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h2{ font-size:13px; color:var(--accent); margin:0 0 12px; font-weight:700; }
+  .row{ display:flex; gap:10px; margin-bottom:10px; }
+  .row:last-child{ margin-bottom:0; }
+  .field{ flex:1; min-width:0; }
+  label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px; }
+  input, select{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:7px;
+    color:var(--text);
+    font-size:15px;
+    padding:9px 10px;
+    font-family:inherit;
+  }
+  input:focus, select:focus{ outline:none; border-color:var(--accent-dim); }
+  select{ appearance:none; -webkit-appearance:none; }
+  .ratio-note{ font-size:12px; color:var(--text-dim); margin-top:8px; }
+  .ratio-note b{ color:var(--text); font-weight:600; }
+
+  /* VT/CT比まとめカード */
+  .ratio-block{ margin-bottom:14px; }
+  .ratio-block:last-child{ margin-bottom:0; }
+  .ratio-block-title{ font-size:12px; color:var(--text); font-weight:600; margin-bottom:8px; }
+  .ratio-small-row{ display:flex; gap:8px; align-items:flex-end; }
+  .ratio-small-row .field{ flex:1; }
+  .ratio-small-row .field.narrow{ flex:0 0 70px; }
+  .ratio-result{
+    flex:0 0 auto;
+    font-size:13px;
+    color:var(--accent);
+    font-weight:700;
+    padding:9px 4px;
+    white-space:nowrap;
+  }
+  hr.sep{ border:none; border-top:1px solid var(--line); margin:14px 0; }
+
+  /* 印加値→電力ヒーローカード */
+  .hero{
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    border:1px solid var(--accent-dim);
+  }
+  .hero-label{
+    font-size:11px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    margin-bottom:8px;
+  }
+  .apply-inputs{
+    display:flex;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  .apply-inputs .field input{
+    font-size:18px;
+    font-weight:700;
+    text-align:center;
+    padding:10px 6px;
+  }
+  .apply-inputs .field label{ text-align:center; }
+  .pf-row{ margin-bottom:10px; }
+  .arrow-divider{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--accent);
+    font-size:20px;
+    margin:6px 0 10px;
+    opacity:0.8;
+  }
+  .result-main{ display:flex; align-items:baseline; justify-content:center; gap:8px; margin-bottom:14px; }
+  .result-main .num{ font-size:38px; font-weight:700; color:var(--accent); font-variant-numeric: tabular-nums; }
+  .result-main .unit{ font-size:15px; color:var(--text-dim); }
+  .sub-results{ display:flex; gap:10px; margin-bottom:14px; }
+  .sub-results .box{ flex:1; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 10px; text-align:center; }
+  .sub-results .box .l{ font-size:11px; color:var(--text-dim); }
+  .sub-results .box .v{ font-size:15px; font-weight:600; font-variant-numeric: tabular-nums; }
+  .steps{ border-top:1px solid var(--line); padding-top:10px; }
+  .steps .step{ font-size:11.5px; color:var(--text-dim); margin-bottom:5px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .steps .step b{ color:var(--text); font-weight:600; }
+
+  .warn{
+    font-size:12px; color:#d98b3d; background:#2a2115; border:1px solid #4a3820;
+    border-radius:7px; padding:8px 10px; margin-top:10px; display:none;
+  }
+  .warn.show{ display:block; }
+
+  .phase-help{
+    margin-top:8px;
+    font-size:12.5px;
+    display:none;
+  }
+  .phase-help.show{ display:block; }
+  .phase-help summary{
+    color:var(--accent);
+    cursor:pointer;
+    list-style:none;
+    font-weight:600;
+  }
+  .phase-help summary::-webkit-details-marker{ display:none; }
+  .phase-help summary::before{ content:"▸ "; }
+  .phase-help[open] summary::before{ content:"▾ "; }
+  .phase-help p{
+    color:var(--text-dim);
+    margin:6px 0 0;
+    padding:8px 10px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:7px;
+    line-height:1.6;
+  }
+
+  footer{ text-align:center; color:var(--text-dim); font-size:11px; margin-top:24px; }
+
+  .help-btn{
+    display:block;
+    text-align:center;
+    background:var(--accent);
+    color:#1b1400;
+    font-weight:700;
+    font-size:14px;
+    text-decoration:none;
+    border-radius:8px;
+    padding:11px;
+    margin:8px 0 4px;
+  }
+  .prompt-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .prompt-item{
+    text-align:left;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:7px;
+    color:var(--text);
+    font-family:inherit;
+    font-size:12.5px;
+    line-height:1.5;
+    padding:9px 10px;
+    cursor:pointer;
+  }
+  .prompt-item:active{ background:var(--accent-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>電力計算ツール</h1>
+  <p class="sub">VT・CT二次側の印加値から、一次側の電力を算出します</p>
+
+  <div class="card">
+    <h2>結線方式</h2>
+    <div class="row">
+      <div class="field">
+        <label>結線</label>
+        <select id="circuitType">
+          <option value="3p3w">3φ3W(三相三線式)</option>
+          <option value="3p4w">3φ4W(三相四線式)</option>
+          <option value="1p2w">1φ2W(単相二線式)</option>
+          <option value="1p3w">1φ3W(単相三線式)</option>
+        </select>
+      </div>
+    </div>
+    <p class="ratio-note" id="circuitNote">3φ3W: P=√3×V×I×cosφ(VTは線間電圧)/ 3φ4W: P=3×V×I×cosφ(VTは相電圧・線間中性点)</p>
+  </div>
+
+  <div class="card">
+    <h2>VT・CT比</h2>
+
+    <div class="ratio-block">
+      <div class="ratio-block-title">VT(計器用変圧器)</div>
+      <div class="row">
+        <div class="field">
+          <label>プリセット</label>
+          <select id="vtPreset">
+            <option value="">プリセットを選択...</option>
+            <option value="6600,110">6600V / 110V</option>
+            <option value="3300,110">3300V / 110V</option>
+            <option value="440,110">440V / 110V</option>
+            <option value="220,110">220V / 110V</option>
+            <option value="custom">直接入力</option>
+          </select>
+        </div>
+      </div>
+      <div class="ratio-small-row">
+        <div class="field">
+          <label>1次定格 (V)</label>
+          <input type="number" id="vtPrimary" value="6600">
+        </div>
+        <div class="field">
+          <label>2次定格 (V)</label>
+          <input type="number" id="vtSecondary" value="110">
+        </div>
+        <div class="ratio-result">比 <span id="vtRatioText">-</span></div>
+      </div>
+    </div>
+
+    <hr class="sep">
+
+    <div class="ratio-block">
+      <div class="ratio-block-title">CT(変流器)</div>
+      <div class="row">
+        <div class="field">
+          <label>プリセット</label>
+          <select id="ctPreset">
+            <option value="">プリセットを選択...</option>
+            <option value="5,5">5A / 5A</option>
+            <option value="50,5">50A / 5A</option>
+            <option value="75,5">75A / 5A</option>
+            <option value="100,5">100A / 5A</option>
+            <option value="150,5">150A / 5A</option>
+            <option value="200,5">200A / 5A</option>
+            <option value="300,5">300A / 5A</option>
+            <option value="400,5">400A / 5A</option>
+            <option value="600,5">600A / 5A</option>
+            <option value="750,5">750A / 5A</option>
+            <option value="1000,5">1000A / 5A</option>
+            <option value="custom">直接入力</option>
+          </select>
+        </div>
+      </div>
+      <div class="ratio-small-row">
+        <div class="field">
+          <label>1次定格 (A)</label>
+          <input type="number" id="ctPrimary" value="150">
+        </div>
+        <div class="field">
+          <label>2次定格 (A)</label>
+          <input type="number" id="ctSecondary" value="5">
+        </div>
+        <div class="ratio-result">比 <span id="ctRatioText">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hero">
+    <h2>VT/CT二次側の印加値 → 出力電力</h2>
+
+    <div class="hero-label">この値を印加すると…</div>
+    <div class="apply-inputs">
+      <div class="field">
+        <label id="vtReadingLabel">VT2次 (V)</label>
+        <input type="number" id="vtReading" value="110">
+      </div>
+      <div class="field">
+        <label>CT2次 (A)</label>
+        <input type="number" id="ctReading" value="2.5">
+      </div>
+    </div>
+    <p class="warn" id="vtPhaseWarn">⚠ この結線方式ではVT2次に「相電圧」を入力してください。線間電圧を入力すると正常な値が表示しません。</p>
+    <details class="phase-help" id="phaseHelp">
+      <summary>相電圧とは?</summary>
+      <p>三相の電気には、電圧の測り方が2種類あります。<br><br>
+      ・線間電圧:3本ある電線(R・S・T)のうち、2本の間で測った電圧<br>
+      ・相電圧:1本の電線(R・S・Tのどれか)と、中性線(N)との間で測った電圧<br><br>
+      この2つには「相電圧 = 線間電圧 ÷ √3」という関係があります(√3 ≒ 1.732)。<br>
+      例:線間電圧440Vの回路なら、相電圧は440 ÷ 1.732 ≒ 254Vになります。</p>
+    </details>
+    <div class="row pf-row">
+      <div class="field">
+        <label>力率 cosφ (0〜1)</label>
+        <input type="number" id="pf" value="1" step="0.01" min="0" max="1">
+      </div>
+    </div>
+    <p class="warn" id="pfWarn">力率は0〜1の範囲で入力してください</p>
+
+    <div class="arrow-divider">↓</div>
+
+    <div class="hero-label" style="text-align:center;">この電力が出ます</div>
+    <div class="result-main">
+      <span class="num" id="resultKw">-</span>
+      <span class="unit">kW(有効電力)</span>
+    </div>
+    <div class="sub-results">
+      <div class="box">
+        <div class="l">皮相電力</div>
+        <div class="v" id="resultKva">-</div>
+      </div>
+      <div class="box">
+        <div class="l">無効電力</div>
+        <div class="v" id="resultKvar">-</div>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">実電圧 V = VT2次実測 × VT比 = <b id="stepV">-</b></div>
+      <div class="step">実電流 I = CT2次実測 × CT比 = <b id="stepI">-</b></div>
+      <div class="step" id="stepFormula">P = -</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>電力量計のパルス間隔</h2>
+    <div class="row">
+      <div class="field">
+        <label>パルス定数 (kWh / パルス)</label>
+        <input type="number" id="pulseConst" placeholder="例: 10" step="0.01">
+      </div>
+    </div>
+    <p class="ratio-note" id="pulseCondition">VT/CT二次側 -V、-A、力率-で出力時</p>
+    <div class="sub-results">
+      <div class="box">
+        <div class="l">1パルスの間隔</div>
+        <div class="v" id="pulseSec">-</div>
+      </div>
+      <div class="box">
+        <div class="l">1時間あたりのパルス数</div>
+        <div class="v" id="pulsePerHour">-</div>
+      </div>
+    </div>
+    <p class="ratio-note" id="pulseFormula">t = (パルス定数 ÷ 有効電力[kW]) × 3600 秒 / 使用する有効電力は上の計算結果(kW)です</p>
+    <p class="warn" id="pulseWarn">有効電力(kW)が0以下のため計算できません</p>
+  </div>
+
+  <div class="card">
+    <h2>目標の無効電力(var)から逆算</h2>
+    <div class="row">
+      <div class="field">
+        <label>目標無効電力 (kvar)</label>
+        <input type="number" id="targetKvar" placeholder="例: 100" step="0.1">
+      </div>
+    </div>
+    <p class="ratio-note" id="reqCondition">VT/CT二次側 -V、-Aで出力時</p>
+    <div class="sub-results">
+      <div class="box">
+        <div class="l">必要な力率 cosφ</div>
+        <div class="v" id="reqPf">-</div>
+      </div>
+      <div class="box">
+        <div class="l">必要な位相角 φ</div>
+        <div class="v" id="reqPhase">-</div>
+      </div>
+    </div>
+    <p class="warn" id="reqImpossible">現在のV・I(上記VT/CT実測値)では、その無効電力は実現できません(皮相電力の上限を超えています)</p>
+    <p class="ratio-note">上限(皮相電力) = <b id="reqKvaMax">-</b> kVA / 使用中の V・I・回路方式はVT/CT欄の設定に連動します</p>
+  </div>
+
+  <div class="card" id="helpCard">
+    <h2>困ったときは</h2>
+    <p class="ratio-note" style="margin-top:0;">図面で分からない用語や記号があったとき、答えだけを聞くのではなく、仕組みや意味を理解するための調べものとしてAIを使う、という活用の仕方もあります。写真を撮って、例えば以下のように聞いてみると理解の手助けになることがあります。</p>
+
+    <div class="ratio-block-title" style="margin-top:10px;">写真を撮るときの注意点</div>
+    <p class="ratio-note" style="margin-top:0;">
+      ・部屋を明るくして、影が映り込まないようにする<br>
+      ・図面に対して真正面から撮る(斜めからだと文字がゆがんで読み取りにくい)<br>
+      ・数字や記号がはっきり読めるくらいまで近づく(1枚で全部入らない時は分けて撮る)<br>
+      ・ピンボケしていないか撮った後に必ず確認する
+    </p>
+
+    <div class="ratio-block-title">質問の例(タップでコピー)</div>
+    <div class="prompt-list">
+      <button class="prompt-item" data-copy="VT(計器用変圧器)とCT(変流器)は、それぞれ何のために使われるものですか？初心者にもわかるように教えてください">
+        「VT(計器用変圧器)とCT(変流器)は、それぞれ何のために使われるものですか？初心者にもわかるように教えてください」
+      </button>
+      <button class="prompt-item" data-copy="この記号(マーク)の意味を教えてください。また、電気図面で使われる記号には他にどんな種類がありますか">
+        「この記号(マーク)の意味を教えてください。また、電気図面で使われる記号には他にどんな種類がありますか」
+      </button>
+      <button class="prompt-item" data-copy="三相3線と三相4線はそれぞれどんな仕組みで、何が違うのですか？見分け方のポイントも教えてください">
+        「三相3線と三相4線はそれぞれどんな仕組みで、何が違うのですか？見分け方のポイントも教えてください」
+      </button>
+      <button class="prompt-item" data-copy="電気の基礎知識がまだ少ないので、この図面の内容を一つずつ噛み砕いて説明してください">
+        「電気の基礎知識がまだ少ないので、この図面の内容を一つずつ噛み砕いて説明してください」
+      </button>
+    </div>
+    <p class="ratio-note" id="copyNotice" style="display:none;">コピーしました。</p>
+    <a href="https://chatgpt.com" target="_blank" rel="noopener" class="help-btn">ChatGPTを開く(要通信)</a>
+    <p class="warn show" style="margin-top:10px;">⚠ AIの回答は間違っていることもあるので、鵜呑みにせず、必ず自分でも図面や資料と照らし合わせて確認してください。</p>
+
+    <p class="warn show" style="margin-top:14px;">⚠ 顧客の機密図面をAIにアップロードしてよいかは、社内のルールを必ず確認してから使用してください。</p>
+  </div>
+
+  <footer>すべての計算はこの端末内で完結します(通信なし)</footer>
+</div>
+
+<script>
+function fmt(n, digits){
+  if(!isFinite(n)) return "-";
+  return n.toLocaleString('ja-JP', {minimumFractionDigits:digits, maximumFractionDigits:digits});
+}
+
+function calc(){
+  const vtP = parseFloat(document.getElementById('vtPrimary').value);
+  const vtS = parseFloat(document.getElementById('vtSecondary').value);
+  const vtReading = parseFloat(document.getElementById('vtReading').value);
+  const ctP = parseFloat(document.getElementById('ctPrimary').value);
+  const ctS = parseFloat(document.getElementById('ctSecondary').value);
+  const ctReading = parseFloat(document.getElementById('ctReading').value);
+  let pf = parseFloat(document.getElementById('pf').value);
+  const circuit = document.getElementById('circuitType').value;
+
+  const pfWarn = document.getElementById('pfWarn');
+  if(isFinite(pf) && (pf < 0 || pf > 1)){
+    pfWarn.classList.add('show');
+  } else {
+    pfWarn.classList.remove('show');
+  }
+
+  const vtRatio = vtP / vtS;
+  const ctRatio = ctP / ctS;
+
+  const vtLabelEl = document.getElementById('vtReadingLabel');
+  const vtPhaseWarnEl = document.getElementById('vtPhaseWarn');
+  const phaseHelpEl = document.getElementById('phaseHelp');
+  if(circuit === '3p4w'){
+    vtLabelEl.textContent = 'VT2次 相電圧 (V)';
+    vtPhaseWarnEl.classList.add('show');
+    phaseHelpEl.classList.add('show');
+  } else if(circuit === '3p3w'){
+    vtLabelEl.textContent = 'VT2次 線間電圧 (V)';
+    vtPhaseWarnEl.classList.remove('show');
+    phaseHelpEl.classList.remove('show');
+  } else if(circuit === '1p3w'){
+    vtLabelEl.textContent = 'VT2次 相電圧 (V)';
+    vtPhaseWarnEl.classList.add('show');
+    phaseHelpEl.classList.add('show');
+  } else {
+    vtLabelEl.textContent = 'VT2次 (V)';
+    vtPhaseWarnEl.classList.remove('show');
+    phaseHelpEl.classList.remove('show');
+  }
+
+  document.getElementById('vtRatioText').textContent =
+    isFinite(vtRatio) ? "≒ " + fmt(vtRatio, 2) : "-";
+  document.getElementById('ctRatioText').textContent =
+    isFinite(ctRatio) ? "≒ " + fmt(ctRatio, 2) : "-";
+
+  const V = vtReading * vtRatio;
+  const I = ctReading * ctRatio;
+
+  document.getElementById('stepV').textContent =
+    isFinite(V) ? fmt(vtReading,2) + "V × " + fmt(vtRatio,2) + " = " + fmt(V,1) + "V" : "-";
+  document.getElementById('stepI').textContent =
+    isFinite(I) ? fmt(ctReading,2) + "A × " + fmt(ctRatio,2) + " = " + fmt(I,1) + "A" : "-";
+
+  let kva, kw, kvar, formulaText;
+  const sinφ = isFinite(pf) ? Math.sqrt(Math.max(0, 1 - pf*pf)) : NaN;
+
+  if(circuit === '3p3w'){
+    kva = Math.sqrt(3) * V * I / 1000;
+    formulaText = "P = √3 × V × I × cosφ = √3 × " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
+  } else if(circuit === '3p4w'){
+    kva = 3 * V * I / 1000;
+    formulaText = "P = 3 × V × I × cosφ = 3 × " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
+  } else if(circuit === '1p2w'){
+    kva = V * I / 1000;
+    formulaText = "P = V × I × cosφ = " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
+  } else { // 1p3w
+    kva = 2 * V * I / 1000;
+    formulaText = "P = 2 × V × I × cosφ = 2 × " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
+  }
+  kw = kva * pf;
+  kvar = kva * sinφ;
+
+  document.getElementById('resultKw').textContent = isFinite(kw) ? fmt(kw, 2) : "-";
+  document.getElementById('resultKva').textContent = isFinite(kva) ? fmt(kva, 2) + " kVA" : "-";
+  document.getElementById('resultKvar').textContent = isFinite(kvar) ? fmt(kvar, 2) + " kvar" : "-";
+  document.getElementById('stepFormula').innerHTML = formulaText + " = <b>" + (isFinite(kw)?fmt(kw,2):"-") + " kW</b>";
+
+  window._currentKvaMax = kva;
+  window._currentKw = kw;
+  reverseCalc();
+  pulseCalc();
+}
+
+function reverseCalc(){
+  const kvaMax = window._currentKvaMax;
+  const targetRaw = document.getElementById('targetKvar').value;
+  const target = parseFloat(targetRaw);
+
+  const reqPfEl = document.getElementById('reqPf');
+  const reqPhaseEl = document.getElementById('reqPhase');
+  const impossibleEl = document.getElementById('reqImpossible');
+  const kvaMaxEl = document.getElementById('reqKvaMax');
+  const condEl = document.getElementById('reqCondition');
+
+  const vtReading = parseFloat(document.getElementById('vtReading').value);
+  const ctReading = parseFloat(document.getElementById('ctReading').value);
+  condEl.textContent = "VT/CT二次側 " +
+    (isFinite(vtReading) ? fmt(vtReading,2) : "-") + "V、" +
+    (isFinite(ctReading) ? fmt(ctReading,2) : "-") + "Aで出力時";
+
+  kvaMaxEl.textContent = isFinite(kvaMax) ? fmt(kvaMax, 2) : "-";
+
+  if(targetRaw === "" || !isFinite(target) || !isFinite(kvaMax) || kvaMax <= 0){
+    reqPfEl.textContent = "-";
+    reqPhaseEl.textContent = "-";
+    impossibleEl.classList.remove('show');
+    return;
+  }
+
+  const sinφ = Math.abs(target) / kvaMax;
+
+  if(sinφ > 1){
+    reqPfEl.textContent = "-";
+    reqPhaseEl.textContent = "-";
+    impossibleEl.classList.add('show');
+    return;
+  }
+
+  impossibleEl.classList.remove('show');
+  const phiRad = Math.asin(sinφ);
+  const phiDeg = phiRad * 180 / Math.PI;
+  const cosφ = Math.cos(phiRad);
+
+  reqPfEl.textContent = fmt(cosφ, 3);
+  reqPhaseEl.textContent = fmt(phiDeg, 2) + "°";
+}
+
+function pulseCalc(){
+  const kw = window._currentKw;
+  const constRaw = document.getElementById('pulseConst').value;
+  const pulseConst = parseFloat(constRaw);
+
+  const secEl = document.getElementById('pulseSec');
+  const perHourEl = document.getElementById('pulsePerHour');
+  const warnEl = document.getElementById('pulseWarn');
+  const condEl = document.getElementById('pulseCondition');
+
+  const vtReading = parseFloat(document.getElementById('vtReading').value);
+  const ctReading = parseFloat(document.getElementById('ctReading').value);
+  const pf = parseFloat(document.getElementById('pf').value);
+
+  condEl.textContent = "VT/CT二次側 " +
+    (isFinite(vtReading) ? fmt(vtReading,2) : "-") + "V、" +
+    (isFinite(ctReading) ? fmt(ctReading,2) : "-") + "A、力率" +
+    (isFinite(pf) ? fmt(pf,2) : "-") + "で出力時";
+
+  if(constRaw === "" || !isFinite(pulseConst)){
+    secEl.textContent = "-";
+    perHourEl.textContent = "-";
+    warnEl.classList.remove('show');
+    return;
+  }
+
+  if(!isFinite(kw) || kw <= 0){
+    secEl.textContent = "-";
+    perHourEl.textContent = "-";
+    warnEl.classList.add('show');
+    return;
+  }
+
+  warnEl.classList.remove('show');
+  const seconds = (pulseConst / kw) * 3600;
+  const perHour = kw / pulseConst;
+
+  secEl.textContent = fmt(seconds, 2) + " 秒";
+  perHourEl.textContent = fmt(perHour, 1) + " 回/h";
+}
+
+function applyPreset(prefix){
+  const sel = document.getElementById(prefix + 'Preset');
+  const val = sel.value;
+  if(!val || val === 'custom') return;
+  const [p, s] = val.split(',');
+  document.getElementById(prefix + 'Primary').value = p;
+  document.getElementById(prefix + 'Secondary').value = s;
+  calc();
+}
+
+let _prevCircuit = document.getElementById('circuitType').value;
+function isPhaseCircuit(c){ return c === '3p4w' || c === '1p3w'; }
+
+document.getElementById('circuitType').addEventListener('change', function(){
+  const newC = this.value;
+  const vtS = parseFloat(document.getElementById('vtSecondary').value);
+  if(isPhaseCircuit(newC) && !isPhaseCircuit(_prevCircuit)){
+    if(isFinite(vtS)){
+      document.getElementById('vtReading').value = (vtS / Math.sqrt(3)).toFixed(3);
+    }
+  } else if(!isPhaseCircuit(newC) && isPhaseCircuit(_prevCircuit)){
+    if(isFinite(vtS)){
+      document.getElementById('vtReading').value = vtS;
+    }
+  }
+  _prevCircuit = newC;
+  calc();
+});
+
+document.getElementById('vtPreset').addEventListener('change', () => applyPreset('vt'));
+document.getElementById('ctPreset').addEventListener('change', () => applyPreset('ct'));
+
+document.querySelectorAll('input, select').forEach(el => {
+  if(['targetKvar','pulseConst','vtPreset','ctPreset','circuitType'].includes(el.id)) return;
+  el.addEventListener('input', calc);
+  el.addEventListener('change', calc);
+});
+document.getElementById('targetKvar').addEventListener('input', reverseCalc);
+document.getElementById('pulseConst').addEventListener('input', pulseCalc);
+calc();
+
+document.querySelectorAll('.prompt-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const text = btn.getAttribute('data-copy');
+    const notice = document.getElementById('copyNotice');
+    const showNotice = () => {
+      notice.style.display = 'block';
+      clearTimeout(window._copyNoticeTimer);
+      window._copyNoticeTimer = setTimeout(() => { notice.style.display = 'none'; }, 2500);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(showNotice).catch(() => {
+        window.prompt('コピーできませんでした。手動でコピーしてください:', text);
+      });
+    } else {
+      window.prompt('この文章をコピーしてください:', text);
+    }
+  });
+});
+</script>
+</body>
+</html>
