@@ -183,6 +183,16 @@
   <h1>電力計算ツール</h1>
   <p class="sub">VT・CT二次側の印加値から、一次側の電力を算出します</p>
 
+  <div class="card" style="border-color:#4a3820; background:#2a2115;">
+    <h2 style="color:#d98b3d;">⚠️ 重要</h2>
+    <p class="ratio-note" style="margin-top:0; color:#e8ecf1;">
+      本アプリは電気計算の参考・学習用です。<br>
+      計算結果の正確性を保証するものではありません。<br>
+      実際の電気設備の設計・機器選定・施工には、必ず有資格者・専門技術者による確認を行ってください。<br>
+      本アプリの計算結果を使用したことによって生じた損害について、作成者は責任を負いません。
+    </p>
+  </div>
+
   <div class="card">
     <h2>結線方式</h2>
     <div class="row">
@@ -213,6 +223,7 @@
             <option value="3300,110">3300V / 110V</option>
             <option value="440,110">440V / 110V</option>
             <option value="220,110">220V / 110V</option>
+            <option value="1,1">VTなし(ダイレクト)</option>
             <option value="custom">直接入力</option>
           </select>
         </div>
@@ -444,9 +455,9 @@ function calc(){
     vtPhaseWarnEl.classList.remove('show');
     phaseHelpEl.classList.remove('show');
   } else if(circuit === '1p3w'){
-    vtLabelEl.textContent = 'VT2次 相電圧 (V)';
-    vtPhaseWarnEl.classList.add('show');
-    phaseHelpEl.classList.add('show');
+    vtLabelEl.textContent = 'VT2次 線間電圧 (V)';
+    vtPhaseWarnEl.classList.remove('show');
+    phaseHelpEl.classList.remove('show');
   } else {
     vtLabelEl.textContent = 'VT2次 (V)';
     vtPhaseWarnEl.classList.remove('show');
@@ -478,9 +489,9 @@ function calc(){
   } else if(circuit === '1p2w'){
     kva = V * I / 1000;
     formulaText = "P = V × I × cosφ = " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
-  } else { // 1p3w
-    kva = 2 * V * I / 1000;
-    formulaText = "P = 2 × V × I × cosφ = 2 × " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
+  } else { // 1p3w (線間電圧設定)
+    kva = V * I / 1000;
+    formulaText = "P = V × I × cosφ(線間電圧) = " + fmt(V,0) + " × " + fmt(I,2) + " × " + fmt(pf,2);
   }
   kw = kva * pf;
   kvar = kva * sinφ;
@@ -592,7 +603,7 @@ function applyPreset(prefix){
 }
 
 let _prevCircuit = document.getElementById('circuitType').value;
-function isPhaseCircuit(c){ return c === '3p4w' || c === '1p3w'; }
+function isPhaseCircuit(c){ return c === '3p4w'; }
 
 document.getElementById('circuitType').addEventListener('change', function(){
   const newC = this.value;
